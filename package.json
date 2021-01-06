@@ -1,0 +1,14 @@
+{
+    "name": "oci_ajd_instantclient_nodejs_fn",
+    "version": "0.1.0",
+    "files": [
+        "func.js"
+    ],
+    "dependencies": {
+        "fs": "*",
+        "@fnproject/fdk": "*",
+        "oci-objectstorage": "*",
+        "oci-common": "*",
+        "oracledb": "*"
+    }
+}
