@@ -3,6 +3,9 @@ const os = require("oci-objectstorage");
 const common = require("oci-common");
 const fs = require("fs").promises;
 const oracledb = require('oracledb');
+oracledb.outFormat = oracledb.OBJECT;
+oracledb.fetchAsString = [oracledb.CLOB];
+oracledb.autoCommit = true;
 
 var walletDownloaded = false;
 
@@ -24,7 +27,7 @@ downloadWallet = async function() {
     console.log("Listing objects...");
     return client.listObjects(listRequest).then((result) => {
         console.log("Received a list of " + result.listObjects.objects.length + " objects.")
-        promises = result.listObjects.objects.map((i) => {
+        return Promise.allSettled(result.listObjects.objects.map((i) => {
             let name = i.name
             getRequest = {
                 namespaceName: namespace,
@@ -43,6 +46,9 @@ downloadWallet = async function() {
                     content = Buffer.concat([content, chunk])
                 }
                 console.log("Writing file...");
+                if(name === "sqlnet.ora") {
+                    return fs.writeFile("/tmp/wallet/" + name, "WALLET_LOCATION = (SOURCE = (METHOD = file) (METHOD_DATA = (DIRECTORY=\"/tmp/wallet\")))\nSSL_SERVER_DN_MATCH=yes")
+                }
                 return fs.writeFile("/tmp/wallet/" + name, content);
             })
             .then((writeResp) => {
@@ -51,16 +57,13 @@ downloadWallet = async function() {
             .catch((e) => {
                 console.error("Error received: " + e.message)
             });
-        });
-        return Promise.allSettled(promises).then((result) => {
-            console.log("Initialising oracle DB client...");
-            oracledb.initOracleClient({configDir: '/tmp/wallet'});
-            oracledb.outFormat = oracledb.OBJECT;
-            oracledb.fetchAsString = [oracledb.CLOB];
-            oracledb.autoCommit = true;
-            walletDownloaded = true;
-            return "Proceeding.";
-        });
+        }));
+    })
+    .then((r) => {
+        console.log("Initialising oracle DB client...");
+        oracledb.initOracleClient({configDir: '/tmp/wallet'});
+        walletDownloaded = true;
+        return "Proceeding.";
     })
     .then((ok) => {
         // Just to cause it to wait on this
@@ -86,12 +89,13 @@ fdk.handle( async function(input){
     let result = [];
 
     try {
-        console.log("Creating connection...");
+        console.log("Creating connection to '" + process.env.TNS_NAME + "'...");
         connection = await oracledb.getConnection({
             user: process.env.DB_USER,
             password: process.env.DB_PASSWORD,
-            // I think connect string only needs DB name as initOracleClient sets up the rest of the stuff
-            connectString: process.env.TNS_NAME
+            // Allegedly connect string only needs DB name as initOracleClient sets up the rest of the stuff by reading the wallet files
+            // connectString: process.env.TNS_NAME
+            connectString: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=lfvaqzxk9tc4jcq_ajdspikle_tp.adb.oraclecloud.com))(security=(MY_WALLET_DIRECTORY="/tmp/wallet")(ssl_server_cert_dn="CN=adwc.uscom-east-1.oraclecloud.com,OU=Oracle BMCS US,O=Oracle Corporation,L=Redwood City,ST=California,C=US")))'
         });
 
         console.log("Opening SODA collection...");
@@ -118,7 +122,7 @@ fdk.handle( async function(input){
     }
     catch(err) {
         console.error(err);
-        return {"error": "Unable to read from database"}
+        return {"error": "" + err}
     }
     finally {
         if (connection) {
@@ -130,6 +134,6 @@ fdk.handle( async function(input){
         }
     }
 
-  return result;
+  return {"data": result};
 }, {});
 
