@@ -12,6 +12,8 @@ downloadWallet = async function() {
         authenticationDetailsProvider: provider
     });
 
+    await fs.mkdir("/tmp/wallet", { recursive: true });
+
     const namespace = process.env.NAMESPACE
     const bucket = process.env.BUCKET_NAME
     console.log("Downloading wallet... Namespace: '" + namespace + "' Bucket: '" + bucket + "'");
@@ -41,7 +43,7 @@ downloadWallet = async function() {
                     content = Buffer.concat([content, chunk])
                 }
                 console.log("Writing file...");
-                return fs.writeFile("/tmp/" + name, content);
+                return fs.writeFile("/tmp/wallet/" + name, content);
             })
             .then((writeResp) => {
                 console.log("Written file.");
@@ -52,7 +54,7 @@ downloadWallet = async function() {
         });
         return Promise.allSettled(promises).then((result) => {
             console.log("Initialising oracle DB client...");
-            oracledb.initOracleClient({configDir: '/tmp'});
+            oracledb.initOracleClient({configDir: '/tmp/wallet'});
             oracledb.outFormat = oracledb.OBJECT;
             oracledb.fetchAsString = [oracledb.CLOB];
             oracledb.autoCommit = true;
