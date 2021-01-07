@@ -9,6 +9,5 @@ RUN yum -y install oracle-release-el7 oracle-nodejs-release-el7 && \
 
 WORKDIR /function
 ADD package.json package-lock.json func.js func.yaml /function/
-RUN npm install oracledb
 RUN npm install
 ENTRYPOINT ["node", "func.js"]

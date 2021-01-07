@@ -5,10 +5,10 @@
         "func.js"
     ],
     "dependencies": {
-        "fs": "*",
-        "@fnproject/fdk": "*",
-        "oci-objectstorage": "*",
-        "oci-common": "*",
-        "oracledb": "*"
+        "fs": "0.0.2",
+        "@fnproject/fdk": "^0.0.19",
+        "oci-objectstorage": "1.10.0",
+        "oci-common": "1.10.0",
+        "oracledb": "5.1.0"
     }
 }

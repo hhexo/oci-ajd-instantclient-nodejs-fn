@@ -1,4 +1,4 @@
 schema_version: 20180708
-name: oci-ajd-instantclient-nodejs-fn
-version: 0.0.1
+name: get-book-by-id-nodejs
+version: 0.0.20
 runtime: docker
