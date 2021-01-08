@@ -1,5 +1,5 @@
 schema_version: 20180708
 name: get-book-by-id-nodejs
-version: 0.0.71
+version: 0.0.73
 runtime: docker
 timeout: 120

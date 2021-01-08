@@ -96,24 +96,14 @@ fdk.handle( async function(input){
             const filterSpec = { "id": input };
             const documents = await collection.find().filter(filterSpec).getDocuments();
             documents.forEach(function(element) {
-                result.push({
-                    id: element.key,
-                    createdOn: element.createdOn,
-                    lastModified: element.lastModified,
-                    document: element.getContent()
-                });
+                result.push(element.getContent());
             });
         } else {
             console.log("Getting all items...");
             // Get all
             const documents = await collection.find().getDocuments();
             documents.forEach(function(element) {
-                result.push({
-                    id: element.key,
-                    createdOn: element.createdOn,
-                    lastModified: element.lastModified,
-                    document: element.getContent()
-                });
+                result.push(element.getContent());
             });
         }
     }
@@ -131,6 +121,6 @@ fdk.handle( async function(input){
         }
     }
 
-  return {"data": result};
+  return result;
 }, {});
 
