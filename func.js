@@ -10,75 +10,56 @@ oracledb.autoCommit = true;
 var walletDownloaded = false;
 
 downloadWallet = async function() {
-    const provider = common.ResourcePrincipalAuthenticationDetailsProvider.builder();
-    const client = new os.ObjectStorageClient({
-        authenticationDetailsProvider: provider
-    });
+    try {
+        const provider = common.ResourcePrincipalAuthenticationDetailsProvider.builder();
+        const client = new os.ObjectStorageClient({
+            authenticationDetailsProvider: provider
+        });
 
-    await fs.mkdir("/tmp/wallet", { recursive: true });
+        await fs.mkdir("/tmp/wallet", { recursive: true });
 
-    const namespace = process.env.NAMESPACE
-    const bucket = process.env.BUCKET_NAME
-    console.log("Downloading wallet... Namespace: '" + namespace + "' Bucket: '" + bucket + "'");
-    listRequest = {
-        namespaceName: namespace,
-        bucketName: bucket
-    };
-    console.log("Listing objects...");
-    return client.listObjects(listRequest).then((result) => {
-        console.log("Received a list of " + result.listObjects.objects.length + " objects.")
-        return Promise.allSettled(result.listObjects.objects.map((i) => {
-            getRequest = {
+        const namespace = process.env.NAMESPACE
+        const bucket = process.env.BUCKET_NAME
+        console.log("Downloading wallet... Namespace: '" + namespace + "' Bucket: '" + bucket + "'");
+        const listRequest = {
+            namespaceName: namespace,
+            bucketName: bucket
+        };
+        console.log("Listing objects...");
+        response = await client.listObjects(listRequest);
+        console.log("Received a list of ", response.listObjects.objects.length, " objects.");
+        for(const obj of response.listObjects.objects) {
+            const getRequest = {
                 namespaceName: namespace,
                 bucketName: bucket,
-                objectName: i.name
+                objectName: obj.name
             };
-            console.log("Setting up download of " + i.name);
-            return client.getObject(getRequest)
-            .then((response) => {
-                console.log("Reading data stream...");
-                let chunk;
-                let content = Buffer.from([]);
-                // Use a loop to make sure we read all currently available data
-                while (null !== (chunk = response.value.read())) {
-                    console.log(`Read ${chunk.length} bytes of data...`);
-                    content = Buffer.concat([content, chunk])
-                }
-                console.log("Writing file...");
-                if(i.name === "sqlnet.ora") {
-                    return fs.writeFile("/tmp/wallet/" + i.name, "WALLET_LOCATION = (SOURCE = (METHOD = file) (METHOD_DATA = (DIRECTORY=\"/tmp/wallet\")))\nSSL_SERVER_DN_MATCH=yes")
-                } else {
-                    return fs.writeFile("/tmp/wallet/" + i.name, content);
-                }
-            })
-            .then((writeResp) => {
-                console.log("Written file.");
-                return fs.readFile("/tmp/wallet/" + i.name);
-            })
-            .then((data) => {
-                console.log("No, really, the file has been written.");
-                return Promise.resolve("OK");
-            })
-            .catch((e) => {
-                console.error("Error received: " + e.message)
-            });
-        }));
-    })
-    .then((r) => {
+            console.log("Setting up download of ", obj.name);
+            getResponse = await client.getObject(getRequest);
+            console.log("Reading data stream...");
+            const chunks = [];
+            for await (let chunk of getResponse.value) {
+                chunks.push(chunk);
+            }
+            const content = Buffer.concat(chunks);
+            console.log("Writing file...");
+            if(obj.name === "sqlnet.ora") {
+                await fs.writeFile("/tmp/wallet/" + obj.name, "WALLET_LOCATION = (SOURCE = (METHOD = file) (METHOD_DATA = (DIRECTORY=\"/tmp/wallet\")))\nSSL_SERVER_DN_MATCH=yes")
+            } else {
+                await fs.writeFile("/tmp/wallet/" + obj.name, content);
+            }
+            console.log("Written file.");
+        }
+
         console.log("Initialising oracle DB client...");
         //oracledb.initOracleClient();
         oracledb.initOracleClient({configDir: '/tmp/wallet'});
         walletDownloaded = true;
-        return "Proceeding.";
-    })
-    .then((ok) => {
-        // Just to cause it to wait on this
-        console.log(ok);
-    })
-    .catch((e) => {
-        console.error("Error received: " + e.message)
-        return {"error": "Unable to list objects"};
-    });
+    }
+    catch(error) {
+        console.error("Error received: " + error)
+        return {"error": "Unable to download objects"};
+    }
 }
 
 fdk.handle( async function(input){

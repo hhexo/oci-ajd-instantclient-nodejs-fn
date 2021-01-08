@@ -11,6 +11,4 @@ WORKDIR /function
 ADD package.json package-lock.json func.js func.yaml /function/
 RUN npm install
 
-# COPY wallet/* /usr/lib/oracle/19.6/client64/lib/network/admin/
-
 ENTRYPOINT ["node", "func.js"]
