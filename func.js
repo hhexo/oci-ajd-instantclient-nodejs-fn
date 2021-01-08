@@ -28,13 +28,12 @@ downloadWallet = async function() {
     return client.listObjects(listRequest).then((result) => {
         console.log("Received a list of " + result.listObjects.objects.length + " objects.")
         return Promise.allSettled(result.listObjects.objects.map((i) => {
-            let name = i.name
             getRequest = {
                 namespaceName: namespace,
                 bucketName: bucket,
-                objectName: name
+                objectName: i.name
             };
-            console.log("Setting up download of " + name);
+            console.log("Setting up download of " + i.name);
             return client.getObject(getRequest)
             .then((response) => {
                 console.log("Reading data stream...");
@@ -46,13 +45,19 @@ downloadWallet = async function() {
                     content = Buffer.concat([content, chunk])
                 }
                 console.log("Writing file...");
-                if(name === "sqlnet.ora") {
-                    return fs.writeFile("/tmp/wallet/" + name, "WALLET_LOCATION = (SOURCE = (METHOD = file) (METHOD_DATA = (DIRECTORY=\"/tmp/wallet\")))\nSSL_SERVER_DN_MATCH=yes")
+                if(i.name === "sqlnet.ora") {
+                    return fs.writeFile("/tmp/wallet/" + i.name, "WALLET_LOCATION = (SOURCE = (METHOD = file) (METHOD_DATA = (DIRECTORY=\"/tmp/wallet\")))\nSSL_SERVER_DN_MATCH=yes")
+                } else {
+                    return fs.writeFile("/tmp/wallet/" + i.name, content);
                 }
-                return fs.writeFile("/tmp/wallet/" + name, content);
             })
             .then((writeResp) => {
                 console.log("Written file.");
+                return fs.readFile("/tmp/wallet/" + i.name);
+            })
+            .then((data) => {
+                console.log("No, really, the file has been written.");
+                return Promise.resolve("OK");
             })
             .catch((e) => {
                 console.error("Error received: " + e.message)
@@ -61,6 +66,7 @@ downloadWallet = async function() {
     })
     .then((r) => {
         console.log("Initialising oracle DB client...");
+        //oracledb.initOracleClient();
         oracledb.initOracleClient({configDir: '/tmp/wallet'});
         walletDownloaded = true;
         return "Proceeding.";
@@ -94,8 +100,8 @@ fdk.handle( async function(input){
             user: process.env.DB_USER,
             password: process.env.DB_PASSWORD,
             // Allegedly connect string only needs DB name as initOracleClient sets up the rest of the stuff by reading the wallet files
-            // connectString: process.env.TNS_NAME
-            connectString: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=lfvaqzxk9tc4jcq_ajdspikle_tp.adb.oraclecloud.com))(security=(MY_WALLET_DIRECTORY="/tmp/wallet")(ssl_server_cert_dn="CN=adwc.uscom-east-1.oraclecloud.com,OU=Oracle BMCS US,O=Oracle Corporation,L=Redwood City,ST=California,C=US")))'
+            connectString: process.env.TNS_NAME
+            //connectString: '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.us-ashburn-1.oraclecloud.com))(connect_data=(service_name=lfvaqzxk9tc4jcq_ajdspikle_tp.adb.oraclecloud.com))(security=(MY_WALLET_DIRECTORY="/tmp/wallet")(ssl_server_cert_dn="CN=adwc.uscom-east-1.oraclecloud.com,OU=Oracle BMCS US,O=Oracle Corporation,L=Redwood City,ST=California,C=US")))'
         });
 
         console.log("Opening SODA collection...");
@@ -109,14 +115,24 @@ fdk.handle( async function(input){
             const filterSpec = { "id": input };
             const documents = await collection.find().filter(filterSpec).getDocuments();
             documents.forEach(function(element) {
-                result.push(element);
+                result.push({
+                    id: element.key,
+                    createdOn: element.createdOn,
+                    lastModified: element.lastModified,
+                    document: element.getContent()
+                });
             });
         } else {
             console.log("Getting all items...");
             // Get all
             const documents = await collection.find().getDocuments();
             documents.forEach(function(element) {
-                result.push(element);
+                result.push({
+                    id: element.key,
+                    createdOn: element.createdOn,
+                    lastModified: element.lastModified,
+                    document: element.getContent()
+                });
             });
         }
     }
